@@ -27,9 +27,66 @@ pytest -q
 cd d:\predictor-ml-python-project
 mlflow ui --backend-store-uri "sqlite:///d:/predictor-ml-python-project/mlflow.db" --port 5000
 ```
+MLFLow visualize in local - http://localhost:5000/
 
-Then open:
-- [http://127.0.0.1:5000](http://127.0.0.1:5000)
+
+## Serve the model (local SQLite registry)
+
+Use a **registry URI** (`models:/...`). Without `models:/`, MLflow treats the string as a **local folder** and fails.
+
+**Recommended (sets SQLite URIs correctly from any directory):**
+
+```powershell
+cd d:\predictor-ml-python-project
+python scripts\serve_model.py
+```
+
+Optional: `python scripts\serve_model.py 5001 "models:/FraudModel/1"`
+
+**Manual PowerShell:**
+
+```powershell
+cd d:\predictor-ml-python-project
+$env:MLFLOW_TRACKING_URI = "sqlite:///d:/predictor-ml-python-project/mlflow.db"
+$env:MLFLOW_REGISTRY_URI = "sqlite:///d:/predictor-ml-python-project/mlflow.db"
+mlflow models serve -m "models:/FraudModel@champion" -p 5001 --no-conda
+```
+
+Run `python scripts\run_pipeline.py` (or train once) first so the `champion` alias exists.
+
+**Scoring:** POST JSON to [http://127.0.0.1:5001/invocations](http://127.0.0.1:5001/invocations). The model expects `age` and `transactions` (see `scripts/feast_inference_request.py`).
+
+cURL you can paste into Postman (**Import → Raw text**):
+
+```bash
+curl -X POST http://127.0.0.1:5001/invocations \
+  -H "Content-Type: application/json" \
+  -d '{"dataframe_records":[{"age":35,"transactions":10},{"age":67,"transactions":120}]}'
+```
+
+One-liner from PowerShell (use `curl.exe` so it is not the `Invoke-WebRequest` alias):
+
+```powershell
+curl.exe -X POST http://127.0.0.1:5001/invocations -H "Content-Type: application/json" -d '{"dataframe_records":[{"age":35,"transactions":10}]}'
+```
+
+### If serve fails with Alembic (`Can't locate revision` / `1b5f0d9ad7c1`)
+
+Your `mlflow.db` was created or migrated with a **different MLflow version** than the one you run now. The fix is to use a matching version and a fresh DB (you will lose old experiment rows in that file).
+
+1. Align the package: `python -m pip install -r requirements.txt` (MLflow is pinned there).
+2. From the project root, back up and remove the DB, then recreate runs:
+
+   ```powershell
+   cd d:\predictor-ml-python-project
+   copy mlflow.db mlflow.db.bak
+   del mlflow.db
+   python scripts\run_pipeline.py
+   ```
+
+3. Start the server again with `python scripts\serve_model.py`.
+
+Always use **`--no-conda`** (or this project’s `serve_model.py`, which passes it) so MLflow does not try to build a virtualenv via **pyenv** on Windows.
 
 ## Main Entry Points
 

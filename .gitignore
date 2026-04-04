@@ -7,3 +7,5 @@ mlruns/
 *.pyd
 .DS_Store
 data/*.parquet
+mlflow.db
+mlartifacts/
